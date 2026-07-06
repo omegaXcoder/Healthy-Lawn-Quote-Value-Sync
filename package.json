@@ -1,0 +1,23 @@
+{
+  "name": "healthy-lawn-nj-quote-value-sync",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WhatConverts -> ServiceAssistant quote/sale value sync for Healthy Lawn NJ (mirrors Summit Quote Value Automation, adapted for the ServiceAssistant/RealGreen CRM instead of Service Autopilot).",
+  "scripts": {
+    "auth": "playwright test --project=setup",
+    "report": "playwright show-report",
+    "sync:dry": "playwright test tests/quote-sync.spec.ts",
+    "sync:dry:headed": "playwright test tests/quote-sync.spec.ts --headed",
+    "sync:live": "cross-env LIVE_RUN=true playwright test tests/quote-sync.spec.ts",
+    "sync:live:headed": "cross-env LIVE_RUN=true playwright test tests/quote-sync.spec.ts --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.50.0",
+    "cross-env": "^10.1.0",
+    "dotenv": "^16.4.5"
+  },
+  "dependencies": {
+    "@types/nodemailer": "^8.0.1",
+    "nodemailer": "^9.0.3"
+  }
+}

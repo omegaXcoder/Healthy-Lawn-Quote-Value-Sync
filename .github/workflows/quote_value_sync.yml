@@ -1,0 +1,96 @@
+name: Quote Value Sync
+
+on:
+  schedule:
+    # Every Monday at 7:00 AM Central Time (13:00 UTC / CDT).
+    # Change to 12:00 UTC during CST (Nov-Mar) to keep 7 AM local time.
+    # Scheduled runs are always LIVE (there's no dry-run input for `schedule`
+    # triggers) — use "Run workflow" below for a dry run.
+    - cron: "0 13 * * 1"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (log everything, write nothing to WhatConverts). Leave 'false' for a live run."
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      date_from:
+        description: "Override start date (YYYY-MM-DD). Leave blank for the default previous-two-weeks range."
+        required: false
+        default: ""
+      date_to:
+        description: "Override end date (YYYY-MM-DD). Leave blank for the default previous-two-weeks range."
+        required: false
+        default: ""
+
+jobs:
+  quote-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Resolve run mode and date range
+        id: run_config
+        run: |
+          LIVE_RUN="true"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.dry_run }}" = "true" ]; then
+            LIVE_RUN="false"
+          fi
+          echo "live_run=$LIVE_RUN" >> "$GITHUB_OUTPUT"
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && \
+             [ -n "${{ inputs.date_from }}" ] && [ -n "${{ inputs.date_to }}" ]; then
+            echo "start_date=${{ inputs.date_from }}" >> "$GITHUB_OUTPUT"
+            echo "end_date=${{ inputs.date_to }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "start_date=" >> "$GITHUB_OUTPUT"
+            echo "end_date=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run quote/sale value sync
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          LOGIN_URL: ${{ secrets.LOGIN_URL }}
+          SAP_USER: ${{ secrets.SAP_USER }}
+          SAP_PASS: ${{ secrets.SAP_PASS }}
+          WHATCONVERTS_API_TOKEN: ${{ secrets.WHATCONVERTS_API_TOKEN }}
+          WHATCONVERTS_API_SECRET: ${{ secrets.WHATCONVERTS_API_SECRET }}
+          WHATCONVERTS_PROFILE_ID: ${{ secrets.WHATCONVERTS_PROFILE_ID }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          SMTP_FROM: ${{ secrets.SMTP_FROM }}
+          SMTP_TO: ${{ secrets.SMTP_TO }}
+          LIVE_RUN: ${{ steps.run_config.outputs.live_run }}
+          START_DATE: ${{ steps.run_config.outputs.start_date }}
+          END_DATE: ${{ steps.run_config.outputs.end_date }}
+        run: npx playwright test tests/quote-sync.spec.ts
+
+      - name: Upload logs and report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: run-logs-${{ github.run_id }}
+          path: |
+            logs/*.txt
+            playwright-report/
+          retention-days: 30
