@@ -93,4 +93,4 @@ jobs:
           path: |
             logs/*.txt
             playwright-report/
-          retention-days: 30
+          retention-days: 7
